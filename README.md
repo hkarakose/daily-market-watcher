@@ -3,6 +3,6 @@
 
 ## Testing
 
-export TELEGRAM_TOKEN="8539467508:AAFD2sTL55wOrFLhZrGHggroRWLdnLsHiB0"
-export TELEGRAM_CHAT_ID="6116084729"
+export TELEGRAM_TOKEN="bot_token"
+export TELEGRAM_CHAT_ID="chat_id"
 python main.py
