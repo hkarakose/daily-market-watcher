@@ -1,2 +1,6 @@
 yfinance
 requests
+apscheduler
+pytz
+python-dotenv
+google-genai

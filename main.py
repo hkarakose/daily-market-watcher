@@ -99,33 +99,6 @@ def compile_message(market_data):
     
     return message
 
-def get_market_data():
-    """Tum sureci yonetir."""
-    history = load_history()
-    current_prices = fetch_prices()
-    
-    market_summary_data = {}
-    new_history = {}
-    
-    for name, current_price in current_prices.items():
-        if current_price is not None:
-            prev_price = history.get(name)
-            change_pct = None
-            if prev_price:
-                change_pct = ((current_price - prev_price) / prev_price) * 100
-            
-            market_summary_data[name] = {
-                "price": current_price,
-                "change": change_pct
-            }
-            new_history[name] = current_price
-        else:
-            market_summary_data[name] = {"price": None, "change": None}
-            
-    message = compile_message(market_summary_data)
-    save_history(new_history)
-    return message
-
 def send_telegram_message(text):
     token = os.getenv("TELEGRAM_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
@@ -147,5 +120,28 @@ def send_telegram_message(text):
         print(f"Telegram mesaji gonderilirken hata: {e}")
 
 if __name__ == "__main__":
-    market_summary = get_market_data()
+    history = load_history()
+    current_prices = fetch_prices()
+    
+    market_summary_data = {}
+    new_history = {}
+    
+    for name, current_price in current_prices.items():
+        if current_price is not None:
+            prev_price = history.get(name)
+            change_pct = None
+            if prev_price:
+                change_pct = ((current_price - prev_price) / prev_price) * 100
+            
+            market_summary_data[name] = {
+                "price": current_price,
+                "change": change_pct
+            }
+            new_history[name] = current_price
+        else:
+            market_summary_data[name] = {"price": None, "change": None}
+            
+    market_summary = compile_message(market_summary_data)
+    save_history(new_history)
+
     send_telegram_message(market_summary)
