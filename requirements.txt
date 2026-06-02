@@ -4,3 +4,4 @@ apscheduler
 pytz
 python-dotenv
 google-genai
+rich
