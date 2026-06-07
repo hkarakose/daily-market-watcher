@@ -13,20 +13,18 @@ from rich.table import Table
 from rich.console import Console
 from rich.align import Align
 
+from webull_client import fetch_premarket
+from telegram_client import send_telegram
+
 load_dotenv()
 
-WEBULL_API = "https://quotes-gw.webullfintech.com/api/bgw/market/pcIndex?regionId=6&pageSize=50"
 SNAPSHOT_FILE = "premkt_snapshot.json"
 SPIKE_THRESHOLD = 2.0
 MIN_MARKET_CAP = 10_000_000  # $10M — ignore micro-cap stocks
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
 TZ_NY = pytz.timezone("America/New_York")
 PREMKT_START = 4   # 4:00 AM ET
 MARKET_OPEN = 9    # 9:30 AM ET — round down, minute check below
-
 
 def is_premarket_hours():
     now = datetime.now(TZ_NY)
@@ -35,19 +33,7 @@ def is_premarket_hours():
     total_min = now.hour * 60 + now.minute
     return PREMKT_START * 60 <= total_min < int(MARKET_OPEN * 60 + 30)
 
-
-API_HEADERS = {
-    "Referer": "https://www.webull.com/",
-    "appid": "wb_web_us",
-    "platform": "web",
-    "app": "global",
-    "device-type": "Web",
-    "Origin": "https://www.webull.com",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15",
-}
-
 console = Console()
-
 
 def load_snapshot():
     if os.path.exists(SNAPSHOT_FILE):
@@ -78,20 +64,6 @@ def save_history(snapshots):
     snapshots = snapshots[-60:]
     with open(SNAPSHOT_FILE, "w") as f:
         json.dump({"snapshots": snapshots}, f, indent=2)
-
-
-def fetch_premarket():
-    try:
-        r = requests.get(WEBULL_API, headers=API_HEADERS, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-        for group in data.get("groups", []):
-            if group.get("id") == "gainers":
-                return group.get("data", [])
-        return []
-    except Exception as e:
-        console.print(f"[red]API fetch error: {e}[/red]")
-        return None
 
 
 def build_stock_map(raw_data):
@@ -139,7 +111,7 @@ def filter_by_market_cap(stock_map):
 TF_OFFSETS = [(1, "1m"), (3, "3m"), (5, "5m"), (10, "10m"), (15, "15m")]
 
 
-MOM_W = {"1m": 0.35, "3m": 0.25, "5m": 0.20, "10m": 0.12, "15m": 0.08}
+MOMENTUM_WEIGHTS = {"1m": 0.35, "3m": 0.25, "5m": 0.20, "10m": 0.12, "15m": 0.08}
 
 
 def compute_deltas(current, history):
@@ -168,9 +140,9 @@ def compute_deltas(current, history):
 
         total = float(data.get("pchRatio", 0) or 0) * 100
         score = 0.0
-        for l, w in MOM_W.items():
-            v = data.get(f"{l}_chg")
-            score += w * (v if v is not None else total)
+        for label, weight in MOMENTUM_WEIGHTS.items():
+            v = data.get(f"{label}_chg")
+            score += weight * (v if v is not None else total)
         data["mom"] = round(score, 2)
 
     return current
@@ -191,20 +163,6 @@ def detect_spikes(current):
     return spikes
 
 
-def send_telegram(text):
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        return
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    try:
-        requests.post(url, json={
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": text,
-            "parse_mode": "Markdown",
-        }, timeout=5)
-    except Exception as e:
-        console.print(f"[red]Telegram error: {e}[/red]")
-
-
 def send_spike_alerts(spikes):
     if not spikes:
         return
@@ -218,7 +176,7 @@ def send_spike_alerts(spikes):
             f"   1m Change: %{s['min1_change']:+.2f}\n"
             f"   Total Premkt: %{s['total_change']:+.2f}\n\n"
         )
-    threading.Thread(target=send_telegram, args=(msg,), daemon=True).start()
+    #threading.Thread(target=send_telegram, args=(msg,), daemon=True).start()
 
 
 def format_change(val_signed):
