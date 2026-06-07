@@ -30,12 +30,6 @@ jobs:
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: python main.py
 
-    - name: Commit and Push changes
-      run: |
-        git config --global user.name "Market Watcher Bot"
-        git config --global user.email "actions@github.com"
-        git add history.json
-        git diff --quiet && git diff --staged --quiet || (git commit -m "Update market history [skip ci]" && git push)
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
